@@ -14,7 +14,7 @@ local Window = Rayfield:CreateWindow({
 -- THÔNG BÁO DISCORD
 Rayfield:Notify({
    Title = "Hệ Thống Đã Kích Hoạt!",
-   Content = "Discord : https://discord.gg/3D3acCm9k",
+   Content = "Discord : https://discord.gg/JFSNY4rwC",
    Duration = 10,
    Image = 4483362458,
    Actions = { Ignore = { Name = "OK!", Callback = function() end }, },
