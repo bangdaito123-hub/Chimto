@@ -1,13 +1,11 @@
--- [[ ⚡ GIAO THỨC TỐI THƯỢNG: CHIM TO PRENIUM (MASTER UNLIMITED) ⚡ ]] --
--- [[ ÉP XUNG - TRẠNG THÁI PRO - BUG MODE - FULL GAME HUBS ]] --
 
 local success, Rayfield = pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield'))() end)
 if not success then return end
 
 local Window = Rayfield:CreateWindow({
    Name = "CHIM TO PRENIUM [OVERCLOCKED V3]",
-   LoadingTitle = "SUPREME PROTOCOL ACTIVATED...",
-   LoadingSubtitle = "Trí Tuệ Tối Cao - Không Giới Hạn",
+   LoadingTitle = "đang chạy script",
+   LoadingSubtitle = "khởi chạy bách khoa buồi thư",
    Theme = "Light", -- Giao diện màu trắng
    ConfigurationSaving = { Enabled = false }
 })
