@@ -1,0 +1,388 @@
+-- [[ 👑 CHIM TO PREMIUM V2: ULTRA ISOLATION MODE 👑 ]] --
+-- [[ ADMIN ROOT ACCESS | FLUENT UI | 100+ SCRIPTS MERGED ]] --
+
+-- ==========================================
+-- 🛡️ BẢO MẬT LÕI (METATABLE HOOK BYPASS)
+-- ==========================================
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "Kick" or method == "kick" or method == "ReportAbuse" then return nil end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- ==========================================
+-- 🌟 KHỞI TẠO GIAO DIỆN FLUENT UI V2
+-- ==========================================
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "CHIM TO PREMIUM ",
+    SubTitle = "chan bo m de",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(650, 480),
+    Acrylic = true,
+    Theme = "Light",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+-- Tạo Tabs
+local Tabs = {
+    Combat = Window:AddTab({ Title = "Ultra Combat", Icon = "swords" }),
+    Banana = Window:AddTab({ Title = "Banana Auto", Icon = "map-pin" }),
+    BFHubs = Window:AddTab({ Title = "Blox Fruits", Icon = "anchor" }),
+    Turbo = Window:AddTab({ Title = "Turbo Lite", Icon = "zap" }),
+    Others1 = Window:AddTab({ Title = "Other Games 1", Icon = "gamepad-2" }),
+    Others2 = Window:AddTab({ Title = "Other Games 2", Icon = "ghost" }),
+    Utils = Window:AddTab({ Title = "Admin & Utils", Icon = "terminal" }),
+    System = Window:AddTab({ Title = "Overclock V2", Icon = "cpu" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+local LP = game:GetService("Players").LocalPlayer
+local Camera = workspace.CurrentCamera
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TeleportService")
+
+-- Hàm Thực Thi Bọc Pcall (Chống crash)
+local function Execute(url)
+    task.spawn(function() pcall(function() loadstring(game:HttpGet(url))() end) end)
+end
+
+-- ==========================================
+-- ⚔️ TAB: ULTRA COMBAT V2 (AIM, HITBOX, ESP)
+-- ==========================================
+Tabs.Combat:AddParagraph({ Title = "Aimbot V2 (Prediction & Wall Check)", Content = "Thuật toán aimbot nội suy tuyến tính." })
+
+local AimToggle = Tabs.Combat:AddToggle("AimToggle", {Title = "Bật Aimbot", Default = false})
+local AimTeam = Tabs.Combat:AddToggle("AimTeam", {Title = "Kiểm tra đồng đội (Team Check)", Default = true})
+local WallCheck = Tabs.Combat:AddToggle("WallCheck", {Title = "Xuyên tường (Wall Check)", Default = true})
+local ShowFOV = Tabs.Combat:AddToggle("ShowFOV", {Title = "Hiện FOV", Default = false})
+local FOVSlider = Tabs.Combat:AddSlider("FOVSize", {Title = "Kích thước FOV", Min = 10, Max = 1000, Default = 150})
+local SmoothSlider = Tabs.Combat:AddSlider("AimSmooth", {Title = "Độ mượt", Min = 0.01, Max = 1, Default = 0.1})
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2; FOVCircle.NumSides = 90; FOVCircle.Color = Color3.fromRGB(255, 50, 50); FOVCircle.Filled = false
+
+local function isVisible(targetPart)
+    if not Options.WallCheck.Value then return true end
+    local ray = Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 1000)
+    local hit, _ = workspace:FindPartOnRayWithIgnoreList(ray, {LP.Character, Camera})
+    return hit and hit:IsDescendantOf(targetPart.Parent)
+end
+
+RS.RenderStepped:Connect(function()
+    FOVCircle.Visible = Options.ShowFOV.Value
+    FOVCircle.Radius = Options.FOVSize.Value
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    if Options.AimToggle.Value then
+        local target = nil
+        local dist = Options.FOVSize.Value
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= LP and v.Character and v.Character:FindFirstChild("Head") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+                if Options.AimTeam.Value and v.Team == LP.Team then continue end
+                local head = v.Character.Head
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if mag < dist and isVisible(head) then target = head; dist = mag end
+                end
+            end
+        end
+        if target then
+            local prediction = target.Velocity * 0.05
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, target.Position + prediction), Options.AimSmooth.Value)
+        end
+    end
+end)
+
+Tabs.Combat:AddParagraph({ Title = "Hitbox & ESP", Content = "Khuếch đại mục tiêu." })
+local HitboxToggle = Tabs.Combat:AddToggle("HitboxToggle", {Title = "Bật Hitbox", Default = false})
+local HitboxSize = Tabs.Combat:AddSlider("HitboxSize", {Title = "Size Hitbox", Min = 2, Max = 50, Default = 10})
+local ESPToggle = Tabs.Combat:AddToggle("ESPToggle", {Title = "Bật ESP (Xuyên Tường)", Default = false})
+
+RS.Heartbeat:Connect(function()
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= LP and v.Character then
+            -- Hitbox
+            if Options.HitboxToggle.Value and v.Character:FindFirstChild("HumanoidRootPart") then
+                if not (Options.AimTeam.Value and v.Team == LP.Team) then
+                    local hrp = v.Character.HumanoidRootPart
+                    hrp.Size = Vector3.new(Options.HitboxSize.Value, Options.HitboxSize.Value, Options.HitboxSize.Value)
+                    hrp.Transparency = 0.5; hrp.BrickColor = BrickColor.new("Bright blue"); hrp.Material = Enum.Material.Neon; hrp.CanCollide = false
+                end
+            end
+            -- ESP Highlight
+            if Options.ESPToggle.Value then
+                if not v.Character:FindFirstChild("UltraESP") then
+                    local h = Instance.new("Highlight", v.Character)
+                    h.Name = "UltraESP"; h.FillColor = Color3.fromRGB(255, 0, 0); h.FillTransparency = 0.5; h.OutlineColor = Color3.fromRGB(255, 255, 255)
+                end
+            else
+                if v.Character:FindFirstChild("UltraESP") then v.Character.UltraESP:Destroy() end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 🍌 TAB: BANANA AUTO (FULL TỌA ĐỘ)
+-- ==========================================
+Tabs.Banana:AddButton({Title = "Khởi Động Banana Hub (Gốc)", Callback = function() Execute("https://raw.githubusercontent.com/kimprobloxdz/Banana-Free/refs/heads/main/Protected_5609200582002947.lua.txt") end})
+
+local BananaIslands = {
+    ["Sea 1"] = {{"Starter Island", 1045, 16, 1422}, {"Jungle", -1251, 12, 331}, {"Pirate Village", -1147, 4, 3828}, {"Desert", 1114, 5, 4351}, {"Marine Mansion", -2421, 73, 2981}},
+    ["Sea 2"] = {{"Kingdom of Rose", -452, 73, 286}, {"Cafe", -380, 73, 299}, {"Green Bit", -2448, 73, -3172}, {"Snow Mountain", 941, 164, -5330}, {"Dark Arena", 3931, 35, -1355}},
+    ["Sea 3"] = {{"Castle on the Sea", -5075, 315, -3153}, {"Hydra Island", 5228, 1004, 1045}, {"Floating Turtle", -12463, 375, -7548}}
+}
+for sea, list in pairs(BananaIslands) do
+    Tabs.Banana:AddSection(sea)
+    for _, is in pairs(list) do
+        Tabs.Banana:AddButton({Title = "Dịch chuyển: " .. is[1], Callback = function() if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then LP.Character.HumanoidRootPart.CFrame = CFrame.new(is[2], is[3], is[4]) end end})
+    end
+end
+
+-- ==========================================
+-- 🏴‍☠️ TAB: BLOX FRUITS (FULL 40+ HUBS)
+-- ==========================================
+local BFScripts = {
+    {"Maru Hub", "https://raw.githubusercontent.com/LuaCrack/KimP/refs/heads/main/MaruHub"},
+    {"HOHO V4", "https://raw.githubusercontent.com/acsu123/HOHO_H/main/Loading_UI"},
+    {"Shark X Hub", "https://shorturl.at/kyOxL"},
+    {"Quartz Kaitun", "https://raw.githubusercontent.com/xQuartyx/QuartyzScript/main/Loader.lua"},
+    {"Lion Hub", "https://api.luarmor.net/files/v3/loaders/e0c7fcf6c077fc23475cf4ce4db58e42.lua"},
+    {"Hiru Hub", "https://raw.githubusercontent.com/NGUYENVUDUY1/Source/main/HiruHub.lua"},
+    {"REDZ Hub", "https://raw.githubusercontent.com/newredz/BloxFruits/refs/heads/main/Source.luau"},
+    {"Soul Hub", "https://raw.githubusercontent.com/GoblinKun009/Script/refs/heads/main/soulhub"},
+    {"Quantum Hub", "https://raw.githubusercontent.com/flazhy/QuantumOnyx/refs/heads/main/QuantumOnyx.lua"},
+    {"TxZ Hub", "https://raw.githubusercontent.com/DrTxZ/Mercure-Hub/refs/heads/main/Mercure%20Hub.lua"},
+    {"Blue X Hub", "https://raw.githubusercontent.com/Dev-BlueX/BlueX-Hub/refs/heads/main/Main.lua"},
+    {"Zinner Hub", "https://raw.githubusercontent.com/HoangNguyenk8/Roblox/refs/heads/main/BF-Main.luau"},
+    {"Omg Hub", "https://raw.githubusercontent.com/Omgshit/Scripts/main/MainLoader.lua"},
+    {"Madox Hub", "https://raw.githubusercontent.com/GoblinKun009/Script/refs/heads/main/MadoxMain"},
+    {"Arceney Hub", "https://raw.githubusercontent.com/Yumiara/Python/refs/heads/main/BloxFruit-XYZ.lua"},
+    {"Aurora Hub", "https://raw.githubusercontent.com/Jadelly261/BloxFruits/main/Aurora"},
+    {"StarryMoon Hub", "https://power-clock-api.vercel.app/api/clockbloxfruits"},
+    {"SYN Hub", "https://raw.githubusercontent.com/GoblinKun009/Script/refs/heads/main/ZynHub"},
+    {"Shinichi Hub", "https://raw.githubusercontent.com/shinichi-dz/phucshinsayhi/refs/heads/main/ShinichiHub.lua"},
+    {"Mixi Hub", "https://raw.githubusercontent.com/mixihubvip/mixihubvip/refs/heads/main/MixiHub"},
+    {"Onion Hub V8", "https://raw.githubusercontent.com/onion132005-bit/Onion133/refs/heads/main/V8.lua"},
+    {"Bacon Hub (Marines)", function() getgenv().team="Marines"; Execute("https://raw.githubusercontent.com/vinh129150/hack/refs/heads/main/Bloxfruits.lua") end},
+    {"Zen Hub", "https://raw.githubusercontent.com/Itz-Npg/Roblox-Script/main/zenhubbf.lua"},
+    {"Meo X Hub", "https://raw.githubusercontent.com/VanHoangIOS/MeoXHub/refs/heads/main/Main.lua"},
+    {"Orange Hub", "https://raw.githubusercontent.com/HieuDepTrai-Z/Dev_Orange/refs/heads/main/OrangeHub.lua"},
+    {"Leaf Hub", "https://leaf-zeta.onrender.com/api/script"},
+    {"Buffalo Hub V9", "https://raw.githubusercontent.com/trungdao2k4/buffalo/refs/heads/main/traurobloxv9.lua"},
+    {"Teddy Hub", "https://api.luarmor.net/files/v4/loaders/e86ed284a22672d29e906214e7bbf8b9.lua"},
+    {"Teddy Hop Boss", "https://raw.githubusercontent.com/Teddyseetink/Haidepzai/refs/heads/main/TEDDYHUB-FREEMIUM"},
+    {"Ziss Hub", "https://raw.githubusercontent.com/LuaCrack/Zis/refs/heads/main/ZisChuoiEng"},
+    {"Trẩu Hub", "https://raw.githubusercontent.com/trungdao2k4/trauroblox/refs/heads/main/trauv9lord.lua"},
+    {"Min Gaming Hub", function() getgenv().Team="Marines"; Execute("https://github.com/LuaCrack/Min/raw/refs/heads/main/MinVnV5") end},
+    {"Dragon Hub", function() getgenv().team="Pirates"; Execute("https://raw.githubusercontent.com/dragonhubdev/dragonwitheveryone/refs/heads/main/Main-BF.lua") end},
+    {"Apple Hub", "https://raw.githubusercontent.com/longhihilonghihi-hub/AppleHubPremiumV2/refs/heads/main/AppleHubPremiumv2.txt"},
+    {"AnDepZai Hub", "https://raw.githubusercontent.com/AnDepZaiHub/AnDepZaiHubBeta/refs/heads/main/AnDepZaiHubBeta.lua"},
+    {"Xeter Hub", function() getgenv().Version="V3"; getgenv().Team="Marines"; Execute("https://raw.githubusercontent.com/TlDinhKhoi/Xeter/refs/heads/main/Main.lua") end},
+    {"Gravity Hub", "https://raw.githubusercontent.com/Dev-GravityHub/BloxFruit/refs/heads/main/Main.lua"},
+    {"Rubu Hub", "https://raw.githubusercontent.com/Teddyseetink/RUBU/refs/heads/main/RUBUV6.lua"},
+    {"3toc Hub", function() getgenv().Team="Marines"; Execute("https://api.luarmor.net/files/v4/loaders/245375592509cc0bcb3526982431ab18.lua") end},
+    {"Kaitun Rip_indra", function() getgenv().Config={Bosses={Farm="rip_indra"}}; Execute("https://raw.githubusercontent.com/LuaAnarchist/3TOC-HUB/refs/heads/main/KaitunBoss.luau") end},
+    {"Kaitun Dough King", function() getgenv().Config={Bosses={Farm="Dough King"}}; Execute("https://raw.githubusercontent.com/LuaAnarchist/3TOC-HUB/refs/heads/main/KaitunBoss.luau") end},
+    {"Kaitun Darkbeard", function() getgenv().Config={Bosses={Farm="Darkbeard"}}; Execute("https://raw.githubusercontent.com/LuaAnarchist/3TOC-HUB/refs/heads/main/KaitunBoss.luau") end},
+    {"Longhihi Hub", "https://raw.githubusercontent.com/longhihilonghihi-hub/Devs-LongHiHiV3/refs/heads/main/MainV3.txt"},
+    {"Hermanos Hub (PVP)", function() getgenv().script_mode="PVP"; Execute("https://raw.githubusercontent.com/hermanos-dev/hermanos-hub/refs/heads/main/Loader.lua") end}
+}
+
+for _, script in ipairs(BFScripts) do
+    Tabs.BFHubs:AddButton({
+        Title = script[1],
+        Callback = type(script[2]) == "function" and script[2] or function() Execute(script[2]) end
+    })
+end
+
+-- ==========================================
+-- ⚡ TAB: TURBO LITE
+-- ==========================================
+local TurboScripts = {
+    {"Turbo Lite V2 (Main)", "https://raw.githubusercontent.com/TurboLite/Script/main/MainV2.lua"},
+    {"Turbo Lite Fix Lag", "https://raw.githubusercontent.com/TurboLite/Script/main/FixLag.lua"},
+    {"Turbo Lite Hop Boss", "https://raw.githubusercontent.com/TurboLite/Script/main/HopServer.lua"},
+    {"Turbo Lite Nhặt Trái V2", "https://raw.githubusercontent.com/TurboLite/Script/refs/heads/main/AutoFruitV2.lua"},
+    {"Turbo Lite Fly", "https://raw.githubusercontent.com/TurboLite/Script/refs/heads/main/Fly.lua"}
+}
+for _, ts in ipairs(TurboScripts) do Tabs.Turbo:AddButton({Title = ts[1], Callback = function() Execute(ts[2]) end}) end
+
+-- ==========================================
+-- 🎮 TAB: OTHER GAMES 1 & 2
+-- ==========================================
+local OtherGamesList1 = {
+    ["99 Nights"] = {
+        {"Foxname", "https://raw.githubusercontent.com/caomod2077/Script/refs/heads/main/FNDayFarm.lua"},
+        {"Voidware", "https://raw.githubusercontent.com/VapeVoidware/VW-Add/main/nightsintheforest.lua"},
+        {"H4x", "https://raw.githubusercontent.com/H4xScripts/Loader/refs/heads/main/loader2.lua"},
+        {"Ringta", "https://raw.githubusercontent.com/wehibuyfgyuwe/99nights.github.io/refs/heads/main/ringta.lua"},
+        {"Cps Hub", "https://raw.githubusercontent.com/Rx1m/CpsHub/refs/heads/main/Hub"},
+        {"Overhub", "https://raw.githubusercontent.com/hellattexyss/autofarmdiamonds/main/overhubaurofarm.lua"},
+        {"Nameless Hub", "https://api.luarmor.net/files/v3/loaders/62d0b3c311e54e766a981dcd5bfe57b3.lua"}
+    },
+    ["The Forge"] = {
+        {"Catraz Hub", "https://raw.githubusercontent.com/nurvian/Catraz-HUB/refs/heads/main/Catraz/main.lua"},
+        {"No1 Hub", "https://raw.githubusercontent.com/SkibidiHub111/Forge/refs/heads/main/No1Dev"},
+        {"Mirage Hub", "https://api.luarmor.net/files/v3/loaders/2075c39b9a5a2e4414c59c93fe8a5f06.lua"},
+        {"Lazy Hub", function() getgenv().mobileMode=true; Execute("https://raw.githubusercontent.com/LioK251/RbScripts/refs/heads/main/lazyuhub_theforge.lua") end},
+        {"Vxeze Hub", "https://pandadevelopment.net/virtual/file/702a5c5488082e6f"},
+        {"Bonk Hub", "https://bonkhub.online/loader.lua"}
+    },
+    ["MM2"] = {
+        {"Capybara Hub", "https://raw.githubusercontent.com/zorex321/capybara/refs/heads/main/Capybara-Hub"},
+        {"Nexus Hub", "https://raw.githubusercontent.com/NexusScripts212/MurderMystery2/refs/heads/main/Mm2"},
+        {"Overdrive Hub", "https://rawscripts.net/raw/Universal-Script-Overdrive-Hub-43383"},
+        {"XHub", "https://raw.githubusercontent.com/bluedeal/Mm2.xhub/refs/heads/main/Mm2-KeylessV2"},
+        {"Vision Hub", "https://raw.githubusercontent.com/orialdev/VisionHub/refs/heads/main/main.lua"}
+    },
+    ["Blue Lock"] = {
+        {"Control Ball", "https://rawscripts.net/raw/Blue-Lock:-Rivals-Lock-Control-ball-32633"},
+        {"Arbix Hub", "https://raw.githubusercontent.com/Youifpg/Arbix--Hub/refs/heads/main/Blue!ock.lua"},
+        {"Aztreon Hub", "https://raw.githubusercontent.com/aal3-33/Hub/refs/heads/main/Gitscripts/aztreonhub.lua"}
+    }
+}
+
+local OtherGamesList2 = {
+    ["Forsaken"] = {
+        {"Bobby Hub", "https://raw.githubusercontent.com/BobJunior1/ForsakenBoi/refs/heads/main/B0bbyHub"},
+        {"Saryn Hub", "https://rawscripts.net/raw/Forsaken-Saryn-Hub-40752"},
+        {"Vim Hub", "https://raw.githubusercontent.com/zylosboom/ViMHub/refs/heads/main/vimHub.lua"}
+    },
+    ["Da Hood"] = {
+        {"Da Hood Hitbox", function() _G.HeadSize = 10; _G.Disabled = true; RS.RenderStepped:Connect(function() if _G.Disabled then for _,v in next, game:GetService('Players'):GetPlayers() do if v.Name ~= LP.Name then pcall(function() v.Character.HumanoidRootPart.Size = Vector3.new(_G.HeadSize,_G.HeadSize,_G.HeadSize); v.Character.HumanoidRootPart.Transparency = 0.7; v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really black"); v.Character.HumanoidRootPart.Material = "Neon"; v.Character.HumanoidRootPart.CanCollide = false end) end end end end) end},
+        {"Schmeckt", "https://raw.githubusercontent.com/judos887o/MOMENZZZZ/refs/heads/main/MOMENZ%3F"},
+        {"Angel Lol", "https://raw.githubusercontent.com/angel1LOL/angel.LOL4/refs/heads/main/Angel.LOL"},
+        {"Exogens", "https://raw.githubusercontent.com/SprayDrivex/exogen.fun/refs/heads/main/loader.lua"}
+    },
+    ["Fisch & TSB & King Legacy"] = {
+        {"Shield Hub (Fisch)", "https://raw.githubusercontent.com/KAN-FISCH/tesss/refs/heads/main/gunung/fish.lua"},
+        {"Speed X (Fisch)", "https://raw.githubusercontent.com/AhmadV99/Speed-Hub-X/main/Speed%20Hub%20X.lua"},
+        {"MinhNhat Hub (TSB)", "https://raw.githubusercontent.com/MinhNhatHUB/MinhNhat/refs/heads/main/MinhNhatHUB%20(New).lua"},
+        {"Tthanh Hub (TSB)", "https://raw.githubusercontent.com/kaimm2/TSB/refs/heads/main/Tthanh%20Tong%20Hop%20Tech.txt"},
+        {"X7 Software (King Legacy)", function() local r = (syn and syn.request) or (http and http.request) or http_request; loadstring(r({['Url']='https://x7.software',['Method']='GET'}).Body)("X7-a5KsoQGw") end},
+        {"Adel Hub (King Legacy)", "https://raw.githubusercontent.com/AdelOnTheTop/Adel-Hub/main/Main.lua"},
+        {"HULK Hub (King Legacy)", "https://raw.githubusercontent.com/HULKUexe/mobileX/main/FreeScript.lua"}
+    },
+    ["Misc (Bedwars, Tsunami, Brainrot...)"] = {
+        {"Cat Vape (Bedwars)", "https://raw.githubusercontent.com/new-qwertyui/CatV5/refs/heads/main/init.lua"},
+        {"Escape Tsunami", "https://raw.githubusercontent.com/etfbscript-server/EscapeTsunamiForBrainrots/refs/heads/main/Loader.lua"},
+        {"Chilli Hub (Brainrot)", "https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"},
+        {"Ugly Hub (Brainrot)", "https://raw.githubusercontent.com/A0WTGFjaGecc2k42wP0PZAbQphqh/Contact/refs/heads/main/OrzlxZ44HubOwnKQenGRSVztS5ndNb.lua"},
+        {"Kron Hub (Lumber 2)", "https://raw.githubusercontent.com/DevKron/Kron_Hub/refs/heads/main/version_1.0"},
+        {"Nat Hub (Garden)", "https://raw.githubusercontent.com/XNatHub/NatHub/refs/heads/main/NatHubLuarmor.lua"},
+        {"Chloe X (Fish It)", "https://raw.githubusercontent.com/MajestySkie/Chloe-X/main/Main/ChloeX"}
+    }
+}
+
+for cat, scripts in pairs(OtherGamesList1) do
+    Tabs.Others1:AddSection(cat)
+    for _, sc in ipairs(scripts) do Tabs.Others1:AddButton({Title = sc[1], Callback = type(sc[2])
+    == "function" and sc[2] or function() Execute(sc[2]) end}) end
+end
+
+for cat, scripts in pairs(OtherGamesList2) do
+    Tabs.Others2:AddSection(cat)
+    for _, sc in ipairs(scripts) do Tabs.Others2:AddButton({Title = sc[1], Callback = type(sc[2]) == "function" and sc[2] or function() Execute(sc[2]) end}) end
+end
+
+-- ==========================================
+-- 🛠️ TAB: ADMIN & UTILS
+-- ==========================================
+Tabs.Utils:AddSection("Admin Commands")
+local Admins = {
+    {"Infinite Yield", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"},
+    {"CMD-X", "https://raw.githubusercontent.com/CMD-X/CMD-X/master/Source"},
+    {"Fate's Admin", "https://raw.githubusercontent.com/fatesc/fates-admin/main/main.lua"},
+    {"Nameless Admin", "https://raw.githubusercontent.com/FilteringEnabled/NamelessAdmin/main/Source"}
+}
+for _, a in ipairs(Admins) do Tabs.Utils:AddButton({Title = a[1], Callback = function() Execute(a[2]) end}) end
+
+Tabs.Utils:AddSection("Tools & Fun")
+local Tools = {
+    {"Dex Explorer", "https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"},
+    {"Remote Spy", "https://raw.githubusercontent.com/78n/SimpleSpy/main/SimpleSpySource.lua"},
+    {"Godmode Universal", "https://raw.githubusercontent.com/Rawbr10/Roblox-Scripts/refs/heads/main/God%20Mode%20Script%20Universal"},
+    {"Super Fling", "https://raw.githubusercontent.com/long191910/all-my-roblox-script/refs/heads/main/touchfling.lua"},
+    {"Fake Lag", "https://pastebin.com/raw/w6PfESuz"},
+    {"Noclip", function() RS.Stepped:Connect(function() if LP.Character then for _, v in pairs(LP.Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end end end) end},
+    {"Click TP", function() local mouse = LP:GetMouse(); local tool = Instance.new("Tool"); tool.RequiresHandle = false; tool.Name = "Chim To TP Tool"; tool.Activated:Connect(function() LP.Character:MoveTo(mouse.Hit.p + Vector3.new(0, 3, 0)) end); tool.Parent = LP.Backpack end}
+}
+for _, t in ipairs(Tools) do Tabs.Utils:AddButton({Title = t[1], Callback = type(t[2]) == "function" and t[2] or function() Execute(t[2]) end}) end
+
+-- ==========================================
+-- 🚀 TAB: SYSTEM OVERCLOCK V2
+-- ==========================================
+Tabs.System:AddSection("Hiệu Năng (Bug Mode)")
+Tabs.System:AddButton({
+    Title = "🧹 Deep Clean RAM (Auto Loop)",
+    Description = "Bật vòng lặp dọn dẹp bộ nhớ vô hạn",
+    Callback = function()
+        task.spawn(function() while task.wait(30) do collectgarbage("collect") end end)
+        Fluent:Notify({Title = "Overclock", Content = "Đã bật vòng lặp ép xung RAM ảo.", Duration = 3})
+    end
+})
+
+Tabs.System:AddButton({
+    Title = "⚡ FPS Bug (No Texture)",
+    Description = "Xóa đồ họa, tăng 500% FPS",
+    Callback = function()
+        settings().Rendering.QualityLevel = 1
+        for _, v in pairs(game:GetDescendants()) do
+            if v:IsA("BasePart") then v.Material = Enum.Material.Plastic; v.Reflectance = 0
+            elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1 end
+        end
+        game:GetService("Lighting").GlobalShadows = false
+    end
+})
+
+Tabs.System:AddSection("Di Chuyển & Server")
+Tabs.System:AddButton({Title = "Server Hop", Callback = function() local Http = game:GetService("HttpService"); local Servers = Http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")); for _, v in pairs(Servers.data) do if v.playing < v.maxPlayers and v.id ~= game.JobId then TS:TeleportToPlaceInstance(game.PlaceId, v.id) break end end end})
+Tabs.System:AddButton({Title = "Small Server Hop", Callback = function() local Http = game:GetService("HttpService"); local Servers = Http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")); table.sort(Servers.data, function(a, b) return a.playing < b.playing end); for _, v in pairs(Servers.data) do if v.id ~= game.JobId then TS:TeleportToPlaceInstance(game.PlaceId, v.id) break end end end})
+
+local WalkSpeed = Tabs.System:AddSlider("WSSlider", {Title = "Tốc Độ (WalkSpeed)", Min = 16, Max = 500, Default = 16})
+local JumpPower = Tabs.System:AddSlider("JPSlider", {Title = "Sức Nhảy (JumpPower)", Min = 50, Max = 500, Default = 50})
+
+RS.Heartbeat:Connect(function()
+    if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+        LP.Character.Humanoid.WalkSpeed = Options.WSSlider.Value
+        LP.Character.Humanoid.JumpPower = Options.JPSlider.Value
+        if Options.JPSlider.Value ~= 50 then LP.Character.Humanoid.UseJumpPower = true end
+    end
+end)
+
+-- Chống AFK
+LP.Idled:Connect(function()
+    game:GetService("VirtualUser"):CaptureController()
+    game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
+
+-- ==========================================
+-- ⚙️ LƯU CONFIG GIAO DIỆN
+-- ==========================================
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+InterfaceManager:SetFolder("ChimToPremiumV2")
+SaveManager:SetFolder("ChimToPremiumV2/Configs")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "dm chung m",
+    Content = "chan bo m de",
+    Duration = 10
+})
