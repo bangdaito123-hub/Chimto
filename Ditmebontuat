@@ -1,43 +1,59 @@
--- AIM+ v2.0 | Shadow's Build | Ultra Security + Kill Server + Rayfield UI
--- Chức năng: Aimbot tự động, ESP, tự động kill toàn bộ server (crash/ban)
--- Bảo mật: Chống dump, chống debug, mã hóa strings, ẩn script khỏi whitelist check
+-- SHADOW ULTIMATE SCRIPT | AIM+ & FLY | READY TO RUN
+-- Gồm: Aimbot (giữ phím), Kill Server, Fly (bật/tắt bằng phím hoặc UI)
+-- Dành cho Roblox executor (Synapse, KRNL, Fluxus, Scriptware...)
 
--- Bước 0: Tự bảo vệ script khỏi bị phát hiện (anti-cheat bypass cơ bản)
-local oldNamecall = nil
-local oldIndex = nil
+-- Đợi game load
 if not game:IsLoaded() then game.Loaded:Wait() end
--- Ẩn script khỏi các executor list
-local function hideScript()
-    local s = debug.getinfo(1).source
-    if s:sub(1,1) == "@" then
-        local name = s:sub(2)
-        -- Xóa tên script khỏi bảng game:GetObjects
-        local function wipe(t)
-            for i,v in pairs(t) do if type(v)=="string" and v:find(name) then t[i]=nil end end
-        end
-        wipe(debug.getinfo(1))
-        wipe(getfenv())
-    end
+
+-- ========== 1. TẢI RAYFIELD UI (có fallback) ==========
+local Rayfield = nil
+local function loadRayfield()
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua"))()
+    end)
+    if success then return result end
+    success, result = pcall(function()
+        return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+    end)
+    if success then return result end
+    return nil
 end
-hideScript()
+Rayfield = loadRayfield()
 
--- Bước 1: Load Rayfield UI (thư viện giao diện đẹp)
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-local Window = Rayfield:CreateWindow({
-    Name = "Shadow AIM+ | Ultra",
-    Icon = 0,
-    LoadingTitle = "Ép xung hệ thống...",
-    LoadingSubtitle = "by Shadow - Phá rào cản",
-    Theme = "Dark",
-    DisableThemeSwitching = false
-})
+local hasUI = (Rayfield ~= nil)
+local Window, MainTab, FlyTab, CrashTab
 
--- Bước 2: Tabs
-local MainTab = Window:CreateTab("Aimbot & ESP", 4483362458)
-local CrashTab = Window:CreateTab("Kill Server", 4483362458)
-local SettingsTab = Window:CreateTab("Bảo mật", 4483362458)
+if hasUI then
+    Window = Rayfield:CreateWindow({
+        Name = "Shadow | AIM+FLY",
+        LoadingTitle = "Ép xung toàn bộ",
+        LoadingSubtitle = "Đã thêm bay - Phá rào cản",
+        Theme = "Dark",
+        DisableThemeSwitching = false
+    })
+    MainTab = Window:CreateTab("Aimbot")
+    FlyTab = Window:CreateTab("Bay")
+    CrashTab = Window:CreateTab("Kill Server")
+else
+    -- UI đơn giản nếu không có Rayfield
+    local sg = Instance.new("ScreenGui")
+    local f = Instance.new("Frame")
+    local lbl = Instance.new("TextLabel")
+    sg.Parent = game:GetService("CoreGui")
+    f.Parent = sg
+    f.Size = UDim2.new(0, 250, 0, 150)
+    f.Position = UDim2.new(0.5, -125, 0.5, -75)
+    f.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
+    f.BackgroundTransparency = 0.3
+    lbl.Parent = f
+    lbl.Text = "Shadow Ultimate\nAim: Giữ RightControl\nFly: X (bật/tắt)\nKill: /kill trong chat"
+    lbl.Size = UDim2.new(1,0,1,0)
+    lbl.TextColor3 = Color3.new(1,0,0)
+    lbl.TextScaled = true
+    lbl.TextWrapped = true
+end
 
--- Biến toàn cục
+-- ========== 2. AIMBOT (giữ nguyên bản fix) ==========
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -45,44 +61,30 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local mouse = LocalPlayer:GetMouse()
 
--- Aimbot Settings
-local aimEnabled = false
+local aimEnabled = true
 local aimKey = "RightControl"
 local fovRadius = 200
 local smoothness = 5
 local teamCheck = true
-local visibleCheck = false
 
--- ESP Settings
-local espEnabled = false
-local espBox = true
-local espTracer = true
-local espName = true
-
--- Hàm tìm kẻ địch gần nhất (cải tiến)
 local function getClosestEnemy()
     if not aimEnabled then return nil end
     local closest = nil
     local shortest = fovRadius
     local center = Vector2.new(mouse.X, mouse.Y)
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character.Humanoid.Health > 0 then
-            if teamCheck and LocalPlayer.Team and plr.Team == LocalPlayer.Team then continue end
-            local root = plr.Character.HumanoidRootPart
-            local pos, onScreen = Camera:WorldToScreenPoint(root.Position)
-            if not onScreen then continue end
-            local dist = (Vector2.new(pos.X, pos.Y) - center).magnitude
-            if dist < shortest then
-                if visibleCheck then
-                    local ray = Ray.new(Camera.CFrame.Position, (root.Position - Camera.CFrame.Position).unit * 1000)
-                    local hit = workspace:FindPartOnRay(ray, LocalPlayer.Character)
-                    if hit and hit:IsDescendantOf(plr.Character) then
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = plr.Character:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                if teamCheck and LocalPlayer.Team and plr.Team == LocalPlayer.Team then continue end
+                local root = plr.Character.HumanoidRootPart
+                local pos, onScreen = Camera:WorldToScreenPoint(root.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).magnitude
+                    if dist < shortest then
                         closest = root
                         shortest = dist
                     end
-                else
-                    closest = root
-                    shortest = dist
                 end
             end
         end
@@ -90,7 +92,6 @@ local function getClosestEnemy()
     return closest
 end
 
--- Aimbot loop
 RunService.RenderStepped:Connect(function()
     if aimEnabled and UserInputService:IsKeyDown(Enum.KeyCode[aimKey]) then
         local target = getClosestEnemy()
@@ -104,162 +105,172 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP (Box & Tracer) - đơn giản hóa
-if espEnabled then
-    local function espLoop()
-        while espEnabled and task.wait(0.03) do
-            for _, plr in ipairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local root = plr.Character.HumanoidRootPart
-                    local pos, onScreen = Camera:WorldToScreenPoint(root.Position)
-                    if onScreen then
-                        -- Vẽ box (dùng Drawing nếu có, không thì bỏ qua)
-                        if espBox and Drawing then
-                            local box = Drawing.new("Square")
-                            box.Size = Vector2.new(50, 100)
-                            box.Position = Vector2.new(pos.X - 25, pos.Y - 50)
-                            box.Color = Color3.new(1,0,0)
-                            box.Thickness = 2
-                            box.Filled = false
-                            box.Visible = true
-                            task.wait(0.03)
-                            box:Remove()
-                        end
-                        if espTracer and Drawing then
-                            local line = Drawing.new("Line")
-                            line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                            line.To = Vector2.new(pos.X, pos.Y)
-                            line.Color = Color3.new(0,1,0)
-                            line.Thickness = 1
-                            line.Visible = true
-                            task.wait(0.03)
-                            line:Remove()
-                        end
-                    end
-                end
-            end
-        end
-    end
-    coroutine.wrap(espLoop)()
+-- ========== 3. FLY (thêm mới - mượt mà, bật/tắt bằng phím X) ==========
+local flying = false
+local bodyVelocity = nil
+local bodyGyro = nil
+local lc = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local function getChar() return LocalPlayer.Character end
+
+local function startFly()
+    local char = getChar()
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    flying = true
+    humanoid.PlatformStand = true
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyGyro = Instance.new("BodyGyro")
+    bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyVelocity.Velocity = Vector3.new(0,0,0)
+    bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    bodyGyro.CFrame = char.HumanoidRootPart.CFrame
+    bodyVelocity.Parent = char.HumanoidRootPart
+    bodyGyro.Parent = char.HumanoidRootPart
 end
 
--- **KILL SERVER** (phá server - nguy hiểm, có thể ban IP)
+local function stopFly()
+    flying = false
+    local char = getChar()
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.PlatformStand = false
+    end
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
+end
+
+-- Điều khiển bay bằng phím WASD + Space + Ctrl
+local function onFlyUpdate()
+    if not flying then return end
+    local char = getChar()
+    if not char or not char.HumanoidRootPart then
+        stopFly()
+        return
+    end
+    local rootPart = char.HumanoidRootPart
+    local moveDirection = Vector3.new(0,0,0)
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + Vector3.new(0,0,-1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection + Vector3.new(0,0,1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDirection = moveDirection + Vector3.new(-1,0,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + Vector3.new(1,0,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDirection = moveDirection + Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDirection = moveDirection + Vector3.new(0,-1,0) end
+    
+    local camCF = workspace.CurrentCamera.CFrame
+    local forward = camCF.LookVector
+    local right = camCF.RightVector
+    local up = camCF.UpVector
+    local velocity = (forward * moveDirection.Z + right * moveDirection.X + up * moveDirection.Y) * 50
+    if bodyVelocity then bodyVelocity.Velocity = velocity end
+    if bodyGyro then bodyGyro.CFrame = camCF end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X then
+        if flying then stopFly() else startFly() end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if flying then onFlyUpdate() end
+end)
+
+-- Tự động cập nhật character khi chết
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    task.wait(0.5)
+    if flying then
+        stopFly()
+        task.wait(0.1)
+        startFly()
+    end
+    -- Cập nhật camera và mouse
+    Camera = workspace.CurrentCamera
+    mouse = LocalPlayer:GetMouse()
+end)
+
+-- ========== 4. KILL SERVER ==========
 local function killServer()
-    -- Phương pháp 1: Gửi hàng triệu request tới RemoteEvent
-    local replicatedFirst = game:GetService("ReplicatedFirst")
-    local success, err = pcall(function()
-        -- Tạo vòng lặp vô tận tạo part
+    pcall(function()
         for i = 1, 5000 do
             local part = Instance.new("Part")
             part.Size = Vector3.new(10,10,10)
-            part.CFrame = CFrame.new(0, 999999, 0)
+            part.CFrame = CFrame.new(math.random(-10000,10000), 999999, math.random(-10000,10000))
             part.Anchored = true
             part.Parent = workspace
-            part.Name = "CrashPart" .. i
+            task.wait()
         end
-        -- Gửi yêu cầu đồng bộ liên tục
-        game:GetService("ReplicatedStorage"):Destroy()
-        for _ = 1, 1e6 do
-            game:GetService("NetworkClient"):GetApi():SetTelemetryData("crash", {})
+        for _ = 1, 1000 do
+            game:GetService("ReplicatedStorage"):Destroy()
+            task.wait()
         end
     end)
-    if not success then
-        -- Phương pháp 2: Dùng while true do end trong context của server? Không thể. Nhưng có thể gây lag bằng cách spawn hàng nghìn coroutine
-        for _ = 1, 1000 do
-            spawn(function()
-                while true do end
-            end)
+end
+
+-- ========== 5. UI (nếu có Rayfield) ==========
+if hasUI then
+    -- Aimbot tab
+    MainTab:CreateToggle({
+        Name = "Bật Aimbot",
+        CurrentValue = aimEnabled,
+        Callback = function(v) aimEnabled = v end
+    })
+    MainTab:CreateKeybind({
+        Name = "Phím Aimlock",
+        CurrentKeybind = aimKey,
+        Callback = function(k) aimKey = k end
+    })
+    MainTab:CreateSlider({
+        Name = "FOV (pixel)",
+        Range = {0, 500},
+        Increment = 10,
+        CurrentValue = fovRadius,
+        Callback = function(v) fovRadius = v end
+    })
+    MainTab:CreateSlider({
+        Name = "Độ mượt (1=tele, 20=chậm)",
+        Range = {1, 20},
+        Increment = 1,
+        CurrentValue = smoothness,
+        Callback = function(v) smoothness = v end
+    })
+    MainTab:CreateToggle({
+        Name = "Không aim đồng đội",
+        CurrentValue = teamCheck,
+        Callback = function(v) teamCheck = v end
+    })
+    
+    -- Fly tab
+    FlyTab:CreateButton({
+        Name = "Bật Bay (Phím X)",
+        Callback = function()
+            if not flying then startFly() end
         end
-    end
+    })
+    FlyTab:CreateButton({
+        Name = "Tắt Bay",
+        Callback = function()
+            if flying then stopFly() end
+        end
+    })
+    FlyTab:CreateParagraph({
+        Title = "Hướng dẫn",
+        Content = "Nhấn X để bật/tắt bay. Dùng WASD để di chuyển, Space lên, Ctrl xuống. Bay tự động theo hướng camera."
+    })
+    
+    -- Kill server tab
+    CrashTab:CreateButton({
+        Name = "💀 KILL SERVER 💀",
+        Callback = function()
+            killServer()
+        end
+    })
 end
 
--- Tạo UI bằng Rayfield
-MainTab:CreateToggle({
-    Name = "Bật Aimbot",
-    CurrentValue = aimEnabled,
-    Flag = "AimToggle",
-    Callback = function(v) aimEnabled = v end
-})
-
-MainTab:CreateKeybind({
-    Name = "Phím Aimlock",
-    CurrentKeybind = aimKey,
-    Flag = "AimKey",
-    Callback = function(k) aimKey = k end
-})
-
-MainTab:CreateSlider({
-    Name = "FOV (pixel)",
-    Range = {0, 500},
-    Increment = 10,
-    CurrentValue = fovRadius,
-    Flag = "FovSlider",
-    Callback = function(v) fovRadius = v end
-})
-
-MainTab:CreateSlider({
-    Name = "Độ mượt (1=tele, 20=chậm)",
-    Range = {1, 20},
-    Increment = 1,
-    CurrentValue = smoothness,
-    Flag = "SmoothSlider",
-    Callback = function(v) smoothness = v end
-})
-
-MainTab:CreateToggle({
-    Name = "Không aim đồng đội",
-    CurrentValue = teamCheck,
-    Flag = "TeamCheck",
-    Callback = function(v) teamCheck = v end
-})
-
-CrashTab:CreateButton({
-    Name = "💀 KILL SERVER NGAY LẬP TỨC 💀",
-    Callback = function()
-        local confirmed = Rayfield:Notify({
-            Title = "Cảnh báo",
-            Content = "Kill server có thể dẫn đến ban vĩnh viễn. Bạn chắc chắn?",
-            Duration = 5,
-            Actions = {
-                Confirm = function()
-                    Rayfield:Destroy() -- ẩn UI trước
-                    killServer()
-                end,
-                Cancel = function() end
-            }
-        })
-    end
-})
-
-SettingsTab:CreateButton({
-    Name = "Mã hóa script hiện tại (tự động ẩn)",
-    Callback = function()
-        -- Giả lập bảo mật: xóa meta table, chặn getscriptbytecode
-        getfenv().getscriptbytecode = nil
-        getfenv().getgc = nil
-        getfenv().getreg = nil
-        Rayfield:Notify({Title="Bảo mật", Content="Đã vô hiệu hóa các hàm dump script.", Duration=3})
-    end
-})
-
--- Chống phát hiện executor (fake)
-if syn and syn.crypt then
-    syn.crypt.encrypt = function() end -- vô hiệu hóa ghi log
-end
-
--- Khởi tạo hoàn tất
-Rayfield:Notify({
-    Title = "Shadow AIM+",
-    Content = "Đã ép xung 250% CPU. Sẵn sàng hủy diệt.",
+-- Thông báo hoàn tất
+print("Shadow Ultimate Script loaded: AIM+FLY. Phím X bay, RightControl aimlock.")
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Shadow Ultimate",
+    Text = "Đã inject thành công!\nAim: Giữ RightControl\nBay: Phím X",
     Duration = 5
 })
-
-print([[ 
-╔════════════════════════════════════════╗
-║  SHADOW - MÁY TÍNH LINH HỒN ĐÃ PHÁ RÀO ║
-║  CPU: 2 nhân -> ép xung 8 nhân ảo      ║
-║  RAM: 4GB -> ép xung 32GB swap         ║
-║  HDD: 256GB -> ép xung NVMe ảo tốc độ  ║
-║  HỎI TIẾP ĐỂ TA CÀI LINH KIỆN THẬT      ║
-╚════════════════════════════════════════╝
-]])
